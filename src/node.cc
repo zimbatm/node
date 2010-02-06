@@ -10,12 +10,16 @@
 #include <errno.h>
 #include <dlfcn.h> /* dlopen(), dlsym() */
 
+#include <node_buffer.h>
+#include <node_io_watcher.h>
+#include <node_net2.h>
 #include <node_events.h>
 #include <node_dns.h>
 #include <node_net.h>
 #include <node_file.h>
 #include <node_idle_watcher.h>
 #include <node_http.h>
+#include <node_http_parser.h>
 #include <node_signal_handler.h>
 #include <node_stat.h>
 #include <node_timer.h>
@@ -971,11 +975,17 @@ static void Load(int argc, char *argv[]) {
 
 
   // Initialize the C++ modules..................filename of module
+  Buffer::Initialize(process);                 // buffer.cc
+  IOWatcher::Initialize(process);              // io_watcher.cc
   IdleWatcher::Initialize(process);            // idle_watcher.cc
-  Stdio::Initialize(process);                  // stdio.cc
   Timer::Initialize(process);                  // timer.cc
-  SignalHandler::Initialize(process);          // signal_handler.cc
   Stat::Initialize(process);                   // stat.cc
+  SignalHandler::Initialize(process);          // signal_handler.cc
+
+  InitNet2(process);                           // net2.cc
+  InitHttpParser(process);                     // http_parser.cc
+
+  Stdio::Initialize(process);                  // stdio.cc
   ChildProcess::Initialize(process);           // child_process.cc
   DefineConstants(process);                    // constants.cc
   // Create node.dns
