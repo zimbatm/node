@@ -57,6 +57,7 @@ HTTPConnection::Initialize (Handle<Object> target)
   client_constructor_template->InstanceTemplate()->SetInternalFieldCount(1);
   client_constructor_template->SetClassName(String::NewSymbol("Client"));
   NODE_SET_PROTOTYPE_METHOD(client_constructor_template, "resetParser", ResetParser);
+  NODE_SET_PROTOTYPE_METHOD(client_constructor_template, "hijack", Hijack);
   target->Set(String::NewSymbol("Client"), client_constructor_template->GetFunction());
 
   t = FunctionTemplate::New(NewServer);
@@ -64,9 +65,8 @@ HTTPConnection::Initialize (Handle<Object> target)
   server_constructor_template->Inherit(Connection::constructor_template);
   server_constructor_template->InstanceTemplate()->SetInternalFieldCount(1);
   NODE_SET_PROTOTYPE_METHOD(server_constructor_template, "resetParser", ResetParser);
+  NODE_SET_PROTOTYPE_METHOD(server_constructor_template, "hijack", Hijack);
   server_constructor_template->SetClassName(String::NewSymbol("ServerSideConnection"));
-
-  eof_symbol = NODE_PSYMBOL("eof");
 
 }
 
@@ -100,6 +100,13 @@ Handle<Value> HTTPConnection::ResetParser(const Arguments& args) {
   return Undefined();
 }
 
+Handle<Value> HTTPConnection::Hijack(const Arguments& args) {
+  HandleScope scope;
+  HTTPConnection *connection = ObjectWrap::Unwrap<HTTPConnection>(args.Holder());
+  connection->Hijack();
+  return Undefined();
+}
+
 
 void
 HTTPConnection::OnReceive (const void *buf, size_t len)
@@ -108,6 +115,11 @@ HTTPConnection::OnReceive (const void *buf, size_t len)
 
   assert(refs_);
   size_t nparsed;
+
+  if (hijacked) {
+    Connection::OnReceive(buf, len);
+    return;
+  }
 
   nparsed = http_parser_execute(&parser_, static_cast<const char*>(buf), len);
 
@@ -164,6 +176,7 @@ HTTPConnection::on_message_begin (http_parser *parser)
     proppatch_sym = NODE_PSYMBOL("PROPPATCH");
     unlock_sym = NODE_PSYMBOL("UNLOCK");
     unknown_method_sym = NODE_PSYMBOL("UNKNOWN_METHOD");
+    eof_symbol = NODE_PSYMBOL("eof");
   }
 
   HTTPConnection *connection = static_cast<HTTPConnection*> (parser->data);

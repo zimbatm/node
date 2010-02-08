@@ -18,11 +18,15 @@ protected:
   static v8::Handle<v8::Value> NewClient (const v8::Arguments& args);
   static v8::Handle<v8::Value> NewServer (const v8::Arguments& args);
   static v8::Handle<v8::Value> ResetParser(const v8::Arguments& args);
+  static v8::Handle<v8::Value> Hijack(const v8::Arguments& args);
+
+  bool hijacked;
 
   HTTPConnection (enum http_parser_type t)
     : Connection()
   {
     type_ = t;
+    hijacked = false;
     ResetParser();
   }
 
@@ -39,6 +43,10 @@ protected:
     parser_.on_body             = on_body;
     parser_.on_message_complete = on_message_complete;
     parser_.data = this;
+  }
+  
+  void Hijack() {
+    hijacked = true;
   }
 
   void OnReceive (const void *buf, size_t len);
