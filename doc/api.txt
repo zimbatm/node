@@ -136,6 +136,9 @@ success code 0.
 +process.cwd()+::
 Returns the current working directory of the process.
 
++process.getuid(), process.setuid(id)+::
+Gets/sets the user identity of the process. (See setuid(2).)
+
 +process.chdir(directory)+::
 Changes the current working directory of the process.
 
@@ -650,6 +653,11 @@ sys.puts("stats: " + JSON.stringify(stats));
 
 +posix.rename(path1, path2)+ ::
   See rename(2).
+  - on success: no parameters.
+  - on error: no parameters.
+
++posix.truncate(fd, len)+ ::
+  See ftruncate(2).
   - on success: no parameters.
   - on error: no parameters.
 
