@@ -2,6 +2,7 @@ require("../common");
 var events = require('events');
 
 var e = new events.EventEmitter();
+e.registerType("newListener", "hello", "exit");
 
 var events_new_listener_emited = [];
 var times_hello_emited = 0;

@@ -4,6 +4,7 @@ var events = require('events');
 var callbacks_called = [ ];
 
 var e = new events.EventEmitter();
+e.registerType("foo");
 
 function callback1() {
     callbacks_called.push("callback1");

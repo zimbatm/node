@@ -172,20 +172,41 @@ process.mixin = function() {
 var eventsModule = createInternalModule('events', function (exports) {
   exports.EventEmitter = process.EventEmitter;
 
+  // TODO: handle "newListener" eventy by default
+  process.EventEmitter.prototype.registerType = function(/*type, ...*/) {
+    if (arguments.length == 0) return [];
+    
+    if (!this._events) this._events = {};
+    
+    for (var i=0, l=arguments.length; i<l; i++) {
+      var type = arguments[i];
+      if (!this._events.hasOwnProperty(type)) {
+        this._events[type] = true;
+      }
+    }
+    
+    return Object.keys(this._events);
+  }
+
   // process.EventEmitter is defined in src/node_events.cc
   // process.EventEmitter.prototype.emit() is also defined there.
+  // FIXME: what happens if we add the same listener twice ?
   process.EventEmitter.prototype.addListener = function (type, listener) {
     if (!(listener instanceof Function)) {
       throw new Error('addListener only takes instances of Function');
     }
 
-    if (!this._events) this._events = {};
+    if (!this._events || !this._events.hasOwnProperty(type)) {
+      throw new Error("addListener does not know type " + type);
+    }
 
     // To avoid recursion in the case that type == "newListeners"! Before
     // adding it to the listeners, first emit "newListeners".
-    this.emit("newListener", type, listener);
+    if (this._events.hasOwnProperty("newListener")) {
+      this.emit("newListener", type, listener);
+    }
 
-    if (!this._events[type]) {
+    if (this._events[type] === true) {
       // Optimize the case of one listener. Don't need the extra array object.
       this._events[type] = listener;
     } else if (this._events[type] instanceof Array) {
@@ -205,16 +226,17 @@ var eventsModule = createInternalModule('events', function (exports) {
     }
 
     // does not use listeners(), so no side effect of creating _events[type]
-    if (!this._events || !this._events[type]) return this;
+    if (!this._events || !this._events.hasOwnProperty(type) || this._events[type] === true) return this;
 
     var list = this._events[type];
-
+    
     if (list instanceof Array) {
       var i = list.indexOf(listener);
       if (i < 0) return this;
       list.splice(i, 1);
     } else {
-      this._events[type] = null;
+      // FIXME: the listener might not be the same
+      this._events[type] = true;
     }
 
     return this;
@@ -222,14 +244,15 @@ var eventsModule = createInternalModule('events', function (exports) {
 
   process.EventEmitter.prototype.removeAllListeners = function (type) {
     // does not use listeners(), so no side effect of creating _events[type]
-    if (!type || !this._events || !this._events[type]) return this;
-    this._events[type] = null;
+    if (!type || !this._events || !this._events.hasOwnProperty(type)) return this;
+    this._events[type] = true;
   };
 
   process.EventEmitter.prototype.listeners = function (type) {
-    if (!this._events) this._events = {};
-    if (!this._events[type]) this._events[type] = [];
-    if (!(this._events[type] instanceof Array)) {
+    if (!this._events || !this._events.hasOwnProperty(type) || this._events[type] === true) return null;
+    if (this.events[type] === true) {
+      this._events[type] = [];
+    } else if (!(this._events[type] instanceof Array)) {
       this._events[type] = [this._events[type]];
     }
     return this._events[type];
@@ -264,10 +287,18 @@ process.nextTick = function (callback) {
 };
 
 
-
-
+process.registerType("exit", "newListener", "uncaughtException");
 
 // Signal Handlers
+
+// FIXME: get a list
+for (var i=0, keys=Object.keys(process), len = keys.lenght; i<len; i++) {
+  if (keys[i].slice(0, 3) === "SIG") {
+    process.registerType(keys[i]);
+  }
+}
+// FIXME: not available on all platforms
+process.registerType("SIGUSR1");
 
 function isSignal (event) {
   return event.slice(0, 3) === 'SIG' && process.hasOwnProperty(event);
@@ -277,6 +308,7 @@ process.addListener("newListener", function (event) {
   if (isSignal(event) && process.listeners(event).length === 0) {
     var b = process.binding('signal_watcher');
     var w = new b.SignalWatcher(process[event]);
+    w.registerType("signal");
     w.addListener("signal", function () {
       process.emit(event);
     });
